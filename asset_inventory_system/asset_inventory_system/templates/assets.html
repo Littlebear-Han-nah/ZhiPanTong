@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>资产列表 - 智盘通</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; color: #333; background: #f8f9fa; }
+        .container { width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .back a { text-decoration: none; color: #007bff; font-size: 16px; }
+        .title { color: #007bff; font-size: 24px; }
+        .search-box { margin-bottom: 20px; text-align: right; }
+        .search-box input { padding: 8px 12px; width: 300px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px; }
+        .search-box button { padding: 8px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .asset-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .asset-table th { background: #007bff; color: white; padding: 15px; text-align: center; font-size: 16px; }
+        .asset-table td { padding: 12px; text-align: center; border-bottom: 1px solid #eee; }
+        .asset-table tr:hover { background: #f9f9f9; }
+        .status-tag { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; color: white; }
+        .status-normal { background: #28a745; }
+        .status-idle { background: #ffc107; }
+        .status-repair { background: #dc3545; }
+        .operate-btn { padding: 6px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; }
+        .operate-btn:hover { background: #0056b3; }
+        .pagination { display: flex; justify-content: center; margin-top: 20px; gap: 10px; }
+        .pagination a { padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; color: #333; }
+        .pagination a.active { background: #007bff; color: white; border-color: #007bff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="back"><a href="/">← 返回首页</a></div>
+            <h2 class="title">固定资产列表</h2>
+        </div>
+        <div class="search-box">
+            <input type="text" placeholder="输入资产名称/RFID标签搜索...">
+            <button>搜索</button>
+        </div>
+        <table class="asset-table">
+            <thead>
+                <tr>
+                    <th>资产ID</th>
+                    <th>资产名称</th>
+                    <th>资产类型</th>
+                    <th>存放位置</th>
+                    <th>状态</th>
+                    <th>RFID标签</th>
+                    <th>采购日期</th>
+                    <th>最后盘点</th>
+                    <th>利用率</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asset in assets %}
+                <tr>
+                    <td>{{ asset.id }}</td>
+                    <td>{{ asset.name }}</td>
+                    <td>{{ asset.type }}</td>
+                    <td>{{ asset.location }}</td>
+                    <td>
+                        {% if asset.status == '正常' %}
+                        <span class="status-tag status-normal">{{ asset.status }}</span>
+                        {% elif asset.status == '闲置' %}
+                        <span class="status-tag status-idle">{{ asset.status }}</span>
+                        {% else %}
+                        <span class="status-tag status-repair">{{ asset.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ asset.rfid_tag }}</td>
+                    <td>{{ asset.purchase_date }}</td>
+                    <td>{{ asset.last_inventory }}</td>
+                    <td>{{ "%.0f%%"|format(asset.utilization_rate*100) }}</td>
+                    <td>
+                        <a href="/assets/{{ asset.id }}" class="operate-btn">详情</a>
+                        <a href="/ar/scan?rfid={{ asset.rfid_tag }}" class="operate-btn" style="margin-left: 5px;">AR扫描</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="pagination">
+            <a href="#">上一页</a>
+            <a href="#" class="active">1</a>
+            <a href="#">2</a>
+            <a href="#">3</a>
+            <a href="#">下一页</a>
+        </div>
+    </div>
+</body>
+</html>

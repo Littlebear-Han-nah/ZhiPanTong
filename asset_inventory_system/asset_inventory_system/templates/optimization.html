@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>资产优化建议 - 智盘通</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; color: #333; background: #f8f9fa; }
+        .container { width: 1200px; margin: 0 auto; padding: 20px; }
+        .back a { text-decoration: none; color: #007bff; font-size: 16px; margin-bottom: 20px; display: inline-block; }
+        .title { color: #007bff; font-size: 24px; margin-bottom: 30px; text-align: center; }
+        .suggestion-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .suggestion-card { background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 25px; transition: all 0.3s; }
+        .suggestion-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .card-header h3 { color: #007bff; font-size: 18px; }
+        .status-tag { padding: 4px 8px; border-radius: 4px; font-size: 12px; color: white; }
+        .status-idle { background: #ffc107; }
+        .status-repair { background: #dc3545; }
+        .status-low { background: #fd7e14; }
+        .card-content { line-height: 1.8; }
+        .info-item { margin-bottom: 8px; }
+        .info-item span { color: #666; display: inline-block; width: 100px; }
+        .suggestion-text { margin-top: 15px; padding: 10px; background: #e9f5ff; border-left: 4px solid #007bff; border-radius: 4px; }
+        .operate-btn { display: inline-block; margin-top: 15px; padding: 8px 16px; background: #007bff; color: white; border-radius: 4px; text-decoration: none; }
+        .operate-btn:hover { background: #0056b3; }
+        .no-suggestion { text-align: center; padding: 50px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="back"><a href="/">← 返回首页</a></div>
+        <h2 class="title">AI资产优化建议（基于实时数据分析）</h2>
+        {% if suggestions %}
+        <div class="suggestion-list">
+            {% for s in suggestions %}
+            <div class="suggestion-card">
+                <div class="card-header">
+                    <h3>{{ s.asset_name }}</h3>
+                    {% if s.status == '闲置' %}
+                    <span class="status-tag status-idle">{{ s.status }}</span>
+                    {% elif s.status == '维修中' %}
+                    <span class="status-tag status-repair">{{ s.status }}</span>
+                    {% else %}
+                    <span class="status-tag status-low">低利用率</span>
+                    {% endif %}
+                </div>
+                <div class="card-content">
+                    <div class="info-item"><span>资产ID：</span>{{ s.asset_id }}</div>
+                    <div class="info-item"><span>当前位置：</span>{{ s.current_location }}</div>
+                    <div class="info-item"><span>利用率：</span>{{ s.utilization_rate }}</div>
+                    <div class="suggestion-text">
+                        <strong>优化建议：</strong>{{ s.suggestion }}
+                    </div>
+                    <a href="/assets/{{ s.asset_id }}" class="operate-btn">查看资产详情</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-suggestion">
+            <h3>所有资产状态良好，利用率达标</h3>
+            <p>当前无优化建议，建议定期进行资产盘点以维持最佳状态</p>
+            <a href="/inventory/simulate" class="operate-btn" style="margin-top: 20px;" onclick="simulateInventory()">开始盘点</a>
+        </div>
+        {% endif %}
+    </div>
+    <script>
+        function simulateInventory() {
+            fetch('/inventory/simulate', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    alert(`盘点完成！\n时间：${data.time}\n总资产数：${data.total_assets}\n成功匹配：${data.success_count}`);
+                    window.location.reload();
+                });
+        }
+    </script>
+</body>
+</html>

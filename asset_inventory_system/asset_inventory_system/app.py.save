@@ -1,0 +1,245 @@
+from flask import Flask, render_template, request, jsonify, redirect, url_for
+import sqlite3
+import random
+from datetime import datetime
+import json
+
+app = Flask(__name__)
+
+# 数据库工具函数（必须放在init_db之前）
+def get_db_connection():
+    conn = sqlite3.connect('asset_inventory.db')
+    conn.row_factory = sqlite3.Row  # 支持按列名访问
+    return conn
+
+# 初始化数据库
+def init_db():
+    conn = get_db_connection()
+    c = conn.cursor()
+    # 资产表
+    c.execute('''CREATE TABLE IF NOT EXISTS assets
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT NOT NULL,
+                  type TEXT NOT NULL,
+                  location TEXT NOT NULL,
+                  status TEXT NOT NULL,
+                  rfid_tag TEXT UNIQUE NOT NULL,
+                  purchase_date DATE,
+                  last_inventory DATE,
+                  utilization_rate REAL,
+                  model_url TEXT DEFAULT 'https://via.placeholder.com/150')''')
+    # 盘点记录表
+    c.execute('''CREATE TABLE IF NOT EXISTS inventory_records
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  asset_id INTEGER,
+                  inventory_time DATETIME,
+                  operator TEXT,
+                  result TEXT,
+                  accuracy REAL,
+                  FOREIGN KEY(asset_id) REFERENCES assets(id))''')
+    # 初始化测试数据
+    c.execute("SELECT COUNT(*) FROM assets")
+    if c.fetchone()[0] == 0:
+        test_assets = [
+            ("生产设备A", "机械设备", "车间1号区域", "正常", "RFID001", "2023-01-15", "2024-10-01", 0.85, "https://via.placeholder.com/150/00FF00"),
+            ("电脑主机B", "电子设备", "办公室3楼", "正常", "RFID002", "2023-03-20", "2024-10-01", 0.92, "https://via.placeholder.com/150/0000FF"),
+            ("货架C", "仓储设备", "仓库2区", "闲置", "RFID003", "2022-11-05", "2024-09-15", 0.23, "https://via.placeholder.com/150/FFFF00"),
+            ("打印机D", "电子设备", "行政办公室", "维修中", "RFID004", "2023-05-10", "2024-09-20", 0.45, "https://via.placeholder.com/150/FF0000"),
+            ("叉车E", "运输设备", "仓库1区", "正常", "RFID005", "2022-08-25", "2024-10-02", 0.78, "https://via.placeholder.com/150/800080")
+        ]
+        c.executemany("INSERT INTO assets VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)", test_assets)
+    conn.commit()
+    conn.close()
+
+# 首页
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# 资产列表页面
+@app.route('/assets')
+def asset_list():
+    conn = get_db_connection()
+    assets = conn.execute('SELECT * FROM assets').fetchall()
+    conn.close()
+    return render_template('assets.html', assets=assets)
+
+# 资产详情页面
+@app.route('/assets/<int:asset_id>')
+def asset_detail(asset_id):
+    conn = get_db_connection()
+    asset = conn.execute('SELECT * FROM assets WHERE id = ?', (asset_id,)).fetchone()
+    records = conn.execute('SELECT * FROM inventory_records WHERE asset_id = ? ORDER BY inventory_time DESC LIMIT 5', 
+                          (asset_id,)).fetchall()
+    conn.close()
+    if asset is None:
+        return "资产不存在", 404
+    return render_template('asset_detail.html', asset=asset, records=records)
+
+# 模拟盘点功能（POST接口）
+@app.route('/inventory/simulate', methods=['POST'])
+def simulate_inventory():
+    conn = get_db_connection()
+    c = conn.cursor()
+    assets = conn.execute('SELECT id, rfid_tag FROM assets').fetchall()
+    results = []
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    accuracy = 0.995
+    
+    for asset in assets:
+        asset_id = asset['id']
+        rfid = asset['rfid_tag']
+        if random.random() < accuracy:
+            result = "匹配成功"
+            c.execute("UPDATE assets SET last_inventory = ? WHERE id = ?", 
+                      (datetime.now().strftime("%Y-%m-%d"), asset_id))
+        else:
+            result = "数据不匹配"
+        
+        c.execute("INSERT INTO inventory_records VALUES (NULL, ?, ?, '系统自动盘点', ?, ?)",
+                  (asset_id, now, result, accuracy))
+        results.append({
+            "asset_id": asset_id,
+            "rfid": rfid,
+            "result": result,
+            "accuracy": accuracy
+        })
+    
+    conn.commit()
+    conn.close()
+    return jsonify({
+        "status": "success",
+        "results": results,
+        "time": now,
+        "total_assets": len(assets),
+        "success_count": len([r for r in results if r["result"] == "匹配成功"])
+    })
+
+# 盘点记录页面
+@app.route('/inventory/records')
+def inventory_records():
+    conn = get_db_connection()
+    records = conn.execute('''
+        SELECT ir.*, a.name as asset_name, a.rfid_tag 
+        FROM inventory_records ir
+        JOIN assets a ON ir.asset_id = a.id
+        ORDER BY ir.inventory_time DESC
+    ''').fetchall()
+    conn.close()
+    return render_template('inventory_records.html', records=records)
+
+# 资产优化建议
+@app.route('/assets/optimization')
+def asset_optimization():
+    conn = get_db_connection()
+    low_util_assets = conn.execute('''
+        SELECT id, name, location, utilization_rate, status 
+        FROM assets 
+        WHERE utilization_rate < 0.3 OR status IN ('维修中', '闲置')
+    ''').fetchall()
+    suggestions = []
+    
+    for asset in low_util_assets:
+        rate = asset['utilization_rate']
+        status = asset['status']
+        if rate < 0.3:
+            suggestion = f"利用率仅{rate:.0%}，建议转移至{get_target_location(asset[2])}或启动报废流程"
+        elif status == '闲置':
+            suggestion = "当前处于闲置状态，建议调配至需求部门提高利用率"
+        else:
+            suggestion = "设备维修中，建议加快维修进度或评估替换方案"
+        
+        suggestions.append({
+            "asset_id": asset['id'],
+            "asset_name": asset['name'],
+            "current_location": asset['location'],
+            "utilization_rate": f"{rate:.0%}",
+            "status": status,
+            "suggestion": suggestion
+        })
+    
+    conn.close()
+    return render_template('optimization.html', suggestions=suggestions)
+
+# 资产类型对应目标位置
+def get_target_location(asset_type):
+    location_map = {
+        "机械设备": "生产车间",
+        "电子设备": "研发办公室",
+        "仓储设备": "物流仓库",
+        "运输设备": "货运码头",
+        "其他": "核心业务区域"
+    }
+    return location_map.get(asset_type, "核心业务区域")
+
+# 数据可视化页面
+@app.route('/data/visualization')
+def data_visualization():
+    conn = get_db_connection()
+    status_data = dict(conn.execute('SELECT status, COUNT(*) FROM assets GROUP BY status').fetchall())
+    type_data = dict(conn.execute('SELECT type, COUNT(*) FROM assets GROUP BY type').fetchall())
+    util_data = {
+        "高利用率(>70%)": len(conn.execute('SELECT * FROM assets WHERE utilization_rate > 0.7').fetchall()),
+        "中利用率(30%-70%)": len(conn.execute('SELECT * FROM assets WHERE utilization_rate BETWEEN 0.3 AND 0.7').fetchall()),
+        "低利用率(<30%)": len(conn.execute('SELECT * FROM assets WHERE utilization_rate < 0.3').fetchall())
+    }
+    accuracy_trend = conn.execute('''
+        SELECT inventory_time, AVG(accuracy) as avg_accuracy 
+        FROM inventory_records 
+        GROUP BY DATE(inventory_time) 
+        ORDER BY inventory_time DESC 
+        LIMIT 10
+    ''').fetchall()
+    conn.close()
+    
+    trend_labels = [row['inventory_time'].split(' ')[0] for row in accuracy_trend][::-1] if accuracy_trend else []
+    trend_values = [round(row['avg_accuracy']*100, 2) for row in accuracy_trend][::-1] if accuracy_trend else []
+    
+    return render_template('visualization.html', 
+                          status_data=status_data, 
+                          type_data=type_data,
+                          util_data=util_data,
+                          trend_labels=json.dumps(trend_labels),
+                          trend_values=json.dumps(trend_values))
+
+# AR识别接口
+@app.route('/ar/recognize', methods=['POST'])
+def ar_recognize():
+    data = request.json
+    rfid_tag = data.get('rfid')
+    conn = get_db_connection()
+    asset = conn.execute('SELECT * FROM assets WHERE rfid_tag = ?', (rfid_tag,)).fetchone()
+    conn.close()
+    
+    if asset:
+        return jsonify({
+            "status": "success",
+            "asset": {
+                "id": asset['id'],
+                "name": asset['name'],
+                "type": asset['type'],
+                "location": asset['location'],
+                "status": asset['status'],
+                "purchase_date": asset['purchase_date'],
+                "last_inventory": asset['last_inventory'],
+                "utilization_rate": f"{asset['utilization_rate']:.0%}",
+                "model_preview": f"{asset['model_url']}?rfid={rfid_tag}",
+                "suggestion": "正常使用" if asset['utilization_rate'] >= 0.3 else "建议转移或报废"
+            }
+        })
+    else:
+        return jsonify({"status": "fail", "msg": "未识别到对应资产，请检查RFID标签"})
+
+# AR识别页面
+@app.route('/ar/scan')
+def ar_scan():
+    return render_template('ar_scan.html')
+
+# 404页面
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
+
+if __name__ == '__main__':
+    init_db()
+    app.run(debug=True, host='0.0.0.0', port=8000)

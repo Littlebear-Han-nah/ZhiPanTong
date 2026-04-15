@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ asset.name }} - 资产详情</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; color: #333; background: #f8f9fa; }
+        .container { width: 1200px; margin: 0 auto; padding: 20px; }
+        .back a { text-decoration: none; color: #007bff; font-size: 16px; margin-bottom: 20px; display: inline-block; }
+        .detail-card { background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 30px; margin-bottom: 30px; }
+        .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .detail-header h2 { color: #007bff; }
+        .asset-model { width: 200px; height: 200px; background: url('{{ asset.model_url }}') center center no-repeat; background-size: contain; border: 1px solid #eee; border-radius: 8px; margin-right: 30px; }
+        .detail-content { display: flex; }
+        .detail-info { flex: 1; }
+        .info-item { margin-bottom: 15px; font-size: 16px; }
+        .info-item span { color: #666; display: inline-block; width: 120px; }
+        .status-tag { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; color: white; background: #28a745; }
+        .records-section { background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 30px; }
+        .records-section h3 { color: #007bff; margin-bottom: 20px; }
+        .record-table { width: 100%; border-collapse: collapse; }
+        .record-table th { background: #f5f5f5; padding: 12px; text-align: center; border-bottom: 1px solid #ddd; }
+        .record-table td { padding: 12px; text-align: center; border-bottom: 1px solid #eee; }
+        .btn { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="back"><a href="/assets">← 返回资产列表</a></div>
+        <div class="detail-card">
+            <div class="detail-header">
+                <h2>{{ asset.name }} 详情</h2>
+                <a href="/ar/scan?rfid={{ asset.rfid_tag }}" class="btn">AR扫描查看</a>
+            </div>
+            <div class="detail-content">
+                <div class="asset-model"></div>
+                <div class="detail-info">
+                    <div class="info-item"><span>资产ID：</span>{{ asset.id }}</div>
+                    <div class="info-item"><span>资产类型：</span>{{ asset.type }}</div>
+                    <div class="info-item"><span>存放位置：</span>{{ asset.location }}</div>
+                    <div class="info-item"><span>资产状态：</span><span class="status-tag">{{ asset.status }}</span></div>
+                    <div class="info-item"><span>RFID标签：</span>{{ asset.rfid_tag }}</div>
+                    <div class="info-item"><span>采购日期：</span>{{ asset.purchase_date }}</div>
+                    <div class="info-item"><span>最后盘点：</span>{{ asset.last_inventory }}</div>
+                    <div class="info-item"><span>利用率：</span>{{ "%.0f%%"|format(asset.utilization_rate*100) }}</div>
+                    <div class="info-item">
+                        <span>操作：</span>
+                        <a href="/inventory/simulate?asset_id={{ asset.id }}" class="btn" style="margin-right: 10px;">单独盘点</a>
+                        <a href="/assets/optimization" class="btn">查看优化建议</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="records-section">
+            <h3>最近5次盘点记录</h3>
+            <table class="record-table">
+                <thead>
+                    <tr>
+                        <th>记录ID</th>
+                        <th>盘点时间</th>
+                        <th>操作员</th>
+                        <th>盘点结果</th>
+                        <th>准确率</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records %}
+                    <tr>
+                        <td>{{ record.id }}</td>
+                        <td>{{ record.inventory_time }}</td>
+                        <td>{{ record.operator }}</td>
+                        <td>{{ record.result }}</td>
+                        <td>{{ "%.2f%%"|format(record.accuracy*100) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5">暂无盘点记录</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div style="text-align: right; margin-top: 15px;">
+                <a href="/inventory/records" class="btn">查看全部记录</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
